@@ -1,7 +1,6 @@
 Raiden Network |capitalized_version| Documentation
 *****************************************
 
-
 This is the documentation for the |version| version of the `Raiden Network <http://raiden.network/>`_. You can find the source code in `our Github Repository <https://github.com/raiden-network/raiden>`_.
 
 What is the Raiden Network?

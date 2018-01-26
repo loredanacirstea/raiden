@@ -48,6 +48,7 @@ Now you are ready :ref:`to get started <running_raiden>`.
 
 For developers
 ==============
+
 If you plan to develop on the Raiden source code, or the binary distributions do not work for your
 system, you can follow these steps to install a development version.
 
@@ -67,9 +68,13 @@ Refer to `its documentation`_ for the installation steps.
 Installation from source
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-Clone the repository::
+Clone the repository:
 
-    git clone https://github.com/raiden-network/raiden.git
+.. container:: highlight
+
+    .. parsed-literal::
+        :class: \ 
+        git clone https://github.com/raiden-network/raiden.git |checkout_branch|
 
 
 Navigate to the directory::
