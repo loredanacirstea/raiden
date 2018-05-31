@@ -7,10 +7,9 @@ import structlog
 
 from raiden.network.rpc.client import JSONRPCClient
 from raiden.network.proxies import (
-    ChannelManager,
+    TokenNetwork,
     Discovery,
-    NettingChannel,
-    Registry,
+    TokenNetworksRegistry,
     Token,
 )
 from raiden.settings import DEFAULT_POLL_TIMEOUT
@@ -36,7 +35,6 @@ class BlockChainService:
 
         self.address_to_token = dict()
         self.address_to_discovery = dict()
-        self.address_to_nettingchannel = dict()
         self.address_to_registry = dict()
         self.address_to_manager = dict()
 
@@ -114,7 +112,7 @@ class BlockChainService:
 
     def channel_manager(self, channel_manager_address):
         if channel_manager_address not in self.address_to_manager:
-            self.address_to_manager[channel_manager_address] = ChannelManager(
+            self.address_to_manager[channel_manager_address] = TokenNetwork(
                 self.client,
                 channel_manager_address,
                 self.poll_timeout,
@@ -136,27 +134,12 @@ class BlockChainService:
 
         return self.address_to_discovery[discovery_address]
 
-    def netting_channel(self, netting_channel_address: bytes) -> NettingChannel:
-        """ Return a proxy to interact with a NettingChannelContract. """
-        if not isaddress(netting_channel_address):
-            raise ValueError('netting_channel_address must be a valid address')
-
-        if netting_channel_address not in self.address_to_nettingchannel:
-            channel = NettingChannel(
-                self.client,
-                netting_channel_address,
-                self.poll_timeout,
-            )
-            self.address_to_nettingchannel[netting_channel_address] = channel
-
-        return self.address_to_nettingchannel[netting_channel_address]
-
-    def registry(self, registry_address: bytes) -> Registry:
+    def registry(self, registry_address: bytes) -> TokenNetworksRegistry:
         if not isaddress(registry_address):
             raise ValueError('registry_address must be a valid address')
 
         if registry_address not in self.address_to_registry:
-            self.address_to_registry[registry_address] = Registry(
+            self.address_to_registry[registry_address] = TokenNetworksRegistry(
                 self.client,
                 registry_address,
                 self.poll_timeout,

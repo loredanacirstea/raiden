@@ -653,8 +653,8 @@ def test_api_transfers(api_backend, raiden_network, token_addresses):
 def test_register_token(api_backend, token_amount, token_addresses, raiden_network):
     app0 = raiden_network[0]
     new_token_address = app0.raiden.chain.deploy_contract(
-        contract_name='HumanStandardToken',
-        contract_path=get_contract_path('HumanStandardToken.sol'),
+        contract_name=CONTRACT_HUMAN_STANDARD_TOKEN,
+        contract_path=get_contract_path(CONTRACT_HUMAN_STANDARD_TOKEN_FILE),
         constructor_parameters=(token_amount, 'raiden', 2, 'Rd'),
     )
 

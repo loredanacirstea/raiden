@@ -403,9 +403,9 @@ class RaidenService:
         self.blockchain_events.add_proxies_listeners(proxies, from_block)
 
         token_network_list = list()
-        for manager in proxies.channel_managers:
-            manager_address = manager.address
-            netting_channel_proxies = proxies.channelmanager_nettingchannels[manager_address]
+        for token_network in proxies.token_networks:
+            token_network_address = token_network.address
+
             network = get_token_network_state_from_proxies(self, manager, netting_channel_proxies)
             token_network_list.append(network)
 

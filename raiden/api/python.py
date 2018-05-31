@@ -6,9 +6,8 @@ import structlog
 from raiden import waiting
 from raiden.blockchain.events import (
     ALL_EVENTS,
-    get_all_registry_events,
-    get_all_netting_channel_events,
-    get_all_channel_manager_events
+    get_all_token_network_registry_events,
+    get_all_token_network_events,
 )
 from raiden.transfer import views
 from raiden.transfer.events import (
@@ -534,8 +533,8 @@ class RaidenAPI:
         )
         return async_result
 
-    def get_network_events(self, registry_address, from_block, to_block):
-        return get_all_registry_events(
+    def get_token_network_registry_events(self, registry_address, from_block, to_block):
+        return get_all_token_network_registry_events(
             self.raiden.chain,
             registry_address,
             events=ALL_EVENTS,
@@ -548,7 +547,7 @@ class RaidenAPI:
             raise InvalidAddress(
                 'Expected binary address format for channel in get_channel_events'
             )
-        returned_events = get_all_netting_channel_events(
+        returned_events = get_all_token_network_events(
             self.raiden.chain,
             channel_address,
             events=ALL_EVENTS,

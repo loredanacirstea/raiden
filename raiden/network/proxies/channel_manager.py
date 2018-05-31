@@ -7,7 +7,7 @@ import structlog
 
 from raiden.blockchain.abi import (
     CONTRACT_MANAGER,
-    CONTRACT_CHANNEL_MANAGER,
+    CONTRACT_TOKEN_NETWORK,
     EVENT_CHANNEL_NEW,
 )
 from raiden.constants import (
@@ -38,13 +38,13 @@ from raiden.utils import (
     pex,
     privatekey_to_address,
 )
-from raiden.utils.typing import Address
+from raiden.utils.typing import Address, ChannelID
 from raiden.constants import NULL_ADDRESS
 
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
 
-class ChannelManager:
+class TokenNetwork:
     def __init__(
             self,
             jsonrpc_client,
@@ -58,13 +58,13 @@ class ChannelManager:
         check_address_has_code(jsonrpc_client, manager_address, 'Channel Manager')
 
         proxy = jsonrpc_client.new_contract_proxy(
-            CONTRACT_MANAGER.get_abi(CONTRACT_CHANNEL_MANAGER),
+            CONTRACT_MANAGER.get_abi(CONTRACT_TOKEN_NETWORK),
             address_encoder(manager_address),
         )
 
         CONTRACT_MANAGER.check_contract_version(
             proxy.call('contract_version').decode(),
-            CONTRACT_CHANNEL_MANAGER
+            CONTRACT_TOKEN_NETWORK
         )
 
         self.address = manager_address
@@ -75,10 +75,10 @@ class ChannelManager:
 
     def token_address(self) -> Address:
         """ Return the token of this manager. """
-        return address_decoder(self.proxy.call('tokenAddress'))
+        return address_decoder(self.proxy.call('token'))
 
-    def new_netting_channel(self, other_peer: Address, settle_timeout: int) -> Address:
-        """ Creates and deploys a new netting channel contract.
+    def new_netting_channel(self, other_peer: ChannelID, settle_timeout: int) -> ChannelID:
+        """ Creates a new channel in the TokenNetwork contract.
 
         Args:
             other_peer: The peer to open the channel with.
@@ -123,39 +123,44 @@ class ChannelManager:
             transaction_hash = self.open_channel_transactions[other_peer].get()
 
         netting_channel_results_encoded = self.proxy.call(
-            'getChannelWith',
+            'getChannelInfo',
+            local_address,
             other_peer,
         )
 
         # address is at index 0
-        netting_channel_address_encoded = netting_channel_results_encoded
+        netting_channel_identifier_encoded = netting_channel_results_encoded[0]
 
-        if not netting_channel_address_encoded:
+        log.debug('netting_channel_identifier_encoded {}'.format(netting_channel_identifier_encoded))
+
+        if not netting_channel_identifier:
             log.error(
-                'netting_channel_address failed',
+                'netting_channel_identifier failed',
                 peer1=pex(local_address),
                 peer2=pex(other_peer)
             )
-            raise RuntimeError('netting_channel_address failed')
+            raise RuntimeError('netting_channel_identifier failed')
 
-        netting_channel_address_bin = address_decoder(netting_channel_address_encoded)
+        #netting_channel_address_bin = address_decoder(netting_channel_address_encoded)
 
         log.info(
             'new_netting_channel called',
             peer1=pex(local_address),
             peer2=pex(other_peer),
-            netting_channel=pex(netting_channel_address_bin),
+            netting_channel=netting_channel_identifier,
         )
 
-        return netting_channel_address_bin
+        return netting_channel_identifier
 
     def _new_netting_channel(self, other_peer, settle_timeout):
+        local_address = privatekey_to_address(self.client.privkey)
         if self.channel_exists(other_peer):
             raise DuplicatedChannelError('Channel with given partner address already exists')
 
         transaction_hash = estimate_and_transact(
             self.proxy,
-            'newChannel',
+            'openChannel',
+            local_address,
             other_peer,
             settle_timeout,
         )
@@ -199,20 +204,17 @@ class ChannelManager:
         ]
 
     def channel_exists(self, participant_address: Address) -> bool:
+        local_address = privatekey_to_address(self.client.privkey)
         existing_channel = self.proxy.call(
-            'getChannelWith',
+            'getChannelInfo',
+            local_address,
             participant_address,
         )
+        existing_channel = existing_channel[2]
 
-        exists = False
+        log.debug('existing_channel {}'.format(existing_channel))
 
-        if existing_channel != NULL_ADDRESS:
-            exists = self.proxy.call(
-                'contractExists',
-                existing_channel
-            )
-
-        return exists
+        return existing_channel > 0
 
     def channelnew_filter(
             self,

@@ -4,12 +4,7 @@ from collections import namedtuple, defaultdict
 
 import structlog
 
-from raiden.blockchain.abi import (
-    CONTRACT_MANAGER,
-    CONTRACT_CHANNEL_MANAGER,
-    CONTRACT_NETTING_CHANNEL,
-    CONTRACT_REGISTRY,
-)
+from raiden.blockchain.abi import *
 from raiden.exceptions import (
     AddressWithoutCode,
     EthNodeCommunicationError,
@@ -24,7 +19,7 @@ EventListener = namedtuple(
 )
 Proxies = namedtuple(
     'Proxies',
-    ('registry', 'channel_managers', 'channelmanager_nettingchannels'),
+    ('registry', 'token_networks'),
 )
 
 # `new_filter` uses None to signal the absence of topics filters
@@ -88,29 +83,29 @@ def get_contract_events(
 # These helpers have a better descriptive name and provide the translator for
 # the caller.
 
-def get_all_channel_manager_events(
+def get_all_token_network_events(
         chain,
-        channel_manager_address,
+        token_network_address,
         events=ALL_EVENTS,
         from_block=0,
         to_block='latest'):
-    """ Helper to get all events of the ChannelManagerContract at
+    """ Helper to get all events of the TokenNetwork at
     `token_address`.
     """
 
     return get_contract_events(
         chain,
-        CONTRACT_MANAGER.get_abi(CONTRACT_CHANNEL_MANAGER),
-        channel_manager_address,
+        CONTRACT_MANAGER.get_abi(CONTRACT_TOKEN_NETWORK),
+        token_network_address,
         events,
         from_block,
         to_block,
     )
 
 
-def get_all_registry_events(
+def get_all_token_network_registry_events(
         chain,
-        registry_address,
+        token_network_registry_address,
         events=ALL_EVENTS,
         from_block=0,
         to_block='latest'):
@@ -119,66 +114,26 @@ def get_all_registry_events(
     """
     return get_contract_events(
         chain,
-        CONTRACT_MANAGER.get_abi(CONTRACT_REGISTRY),
-        registry_address,
+        CONTRACT_MANAGER.get_abi(CONTRACT_TOKEN_NETWORK_REGISTRY),
+        token_network_registry_address,
         events,
         from_block,
         to_block,
     )
-
-
-def get_all_netting_channel_events(
-        chain,
-        netting_channel_address,
-        events=ALL_EVENTS,
-        from_block=0,
-        to_block='latest'):
-    """ Helper to get all events of a NettingChannelContract at
-    `channel_identifier`.
-    """
-
-    return get_contract_events(
-        chain,
-        CONTRACT_MANAGER.get_abi(CONTRACT_NETTING_CHANNEL),
-        netting_channel_address,
-        events,
-        from_block,
-        to_block,
-    )
-
-
-def get_channel_proxies(chain, node_address, channel_manager):
-    participating_channels = channel_manager.channels_by_participant(node_address)
-    netting_channels = []
-    for channel_identifier in participating_channels:
-        # FIXME: implement proper cleanup of self-killed channel after close+settle
-        try:
-            netting_channels.append(chain.netting_channel(channel_identifier))
-        except AddressWithoutCode:
-            log.debug(
-                'Settled channel found when starting raiden. Safely ignored',
-                channel_identifier=pex(channel_identifier)
-            )
-    return netting_channels
 
 
 def get_relevant_proxies(chain, node_address, registry_address):
-    registry = chain.registry(registry_address)
+    token_network_registry = chain.registry(registry_address)
 
-    channel_managers = list()
-    manager_channels = defaultdict(list)
+    token_networks = list()
 
-    for channel_manager_address in registry.manager_addresses():
-        channel_manager = registry.manager(channel_manager_address)
-        channel_managers.append(channel_manager)
-
-        netting_channel_proxies = get_channel_proxies(chain, node_address, channel_manager)
-        manager_channels[channel_manager_address] = netting_channel_proxies
+    for token_network_address in token_network_registry.manager_addresses():
+        channel_manager = token_network_registry.manager(token_network_address)
+        token_networks.append(channel_manager)
 
     proxies = Proxies(
-        registry,
-        channel_managers,
-        manager_channels,
+        token_network_registry,
+        token_networks,
     )
 
     return proxies
@@ -189,32 +144,45 @@ def decode_event_to_internal(event):
     data = event.event_data
 
     # Note: All addresses inside the event_data must be decoded.
-    if data['event'] == 'TokenAdded':
-        data['registry_address'] = address_decoder(data['args']['registry_address'])
-        data['channel_manager_address'] = address_decoder(data['args']['channel_manager_address'])
+    if data['event'] == EVENT_TOKEN_ADDED:
+        data['token_network_address'] = address_decoder(data['args']['token_network_address'])
         data['token_address'] = address_decoder(data['args']['token_address'])
 
-    elif data['event'] == 'ChannelNew':
-        data['registry_address'] = address_decoder(data['args']['registry_address'])
+    elif data['event'] == EVENT_CHANNEL_NEW:
+        data['channel_identifier'] = address_decoder(data['args']['channel_identifier'])
         data['participant1'] = address_decoder(data['args']['participant1'])
         data['participant2'] = address_decoder(data['args']['participant2'])
-        data['netting_channel'] = address_decoder(data['args']['netting_channel'])
+        data['settle_timeout'] = address_decoder(data['args']['settle_timeout'])
 
-    elif data['event'] == 'ChannelNewBalance':
-        data['registry_address'] = address_decoder(data['args']['registry_address'])
-        data['token_address'] = address_decoder(data['args']['token_address'])
+    elif data['event'] == EVENT_CHANNEL_NEW_BALANCE:
+        data['channel_identifier'] = address_decoder(data['args']['channel_identifier'])
         data['participant'] = address_decoder(data['args']['participant'])
+        data['deposit'] = address_decoder(data['args']['deposit'])
 
-    elif data['event'] == 'ChannelClosed':
-        data['registry_address'] = address_decoder(data['args']['registry_address'])
-        data['closing_address'] = address_decoder(data['args']['closing_address'])
+    elif data['event'] == EVENT_CHANNEL_WITHDRAW:
+        data['channel_identifier'] = address_decoder(data['args']['channel_identifier'])
+        data['participant'] = address_decoder(data['args']['participant'])
+        data['withdrawn_amount'] = address_decoder(data['args']['withdrawn_amount'])
 
-    elif data['event'] == 'ChannelSecretRevealed':
-        data['registry_address'] = address_decoder(data['args']['registry_address'])
-        data['receiver_address'] = address_decoder(data['args']['receiver_address'])
+    elif data['event'] == EVENT_CHANNEL_UNLOCK:
+        data['channel_identifier'] = address_decoder(data['args']['channel_identifier'])
+        data['participant'] = address_decoder(data['args']['participant'])
+        data['unlocked_amount'] = address_decoder(data['args']['unlocked_amount'])
+        data['returned_tokens'] = address_decoder(data['args']['returned_tokens'])
 
-    elif data['event'] == 'ChannelSettled':
-        data['registry_address'] = address_decoder(data['args']['registry_address'])
+    elif data['event'] == EVENT_TRANSFER_UPDATED:
+        data['channel_identifier'] = address_decoder(data['args']['channel_identifier'])
+        data['closing_participant'] = address_decoder(data['args']['closing_participant'])
+
+    elif data['event'] == EVENT_CHANNEL_CLOSED:
+        data['channel_identifier'] = address_decoder(data['args']['channel_identifier'])
+        data['closing_participant'] = address_decoder(data['args']['closing_participant'])
+
+    elif data['event'] == EVENT_CHANNEL_SETTLED:
+        data['channel_identifier'] = address_decoder(data['args']['channel_identifier'])
+
+    elif data['event'] == EVENT_CHANNEL_SECRET_REVEALED:
+        data['secrethash'] = address_decoder(data['secrethash'])
 
     return event
 
@@ -302,9 +270,9 @@ class BlockchainEvents:
         registry_address = registry_proxy.address
 
         self.add_event_listener(
-            'Registry {}'.format(pex(registry_address)),
+            '{0} {1}'.format(CONTRACT_TOKEN_NETWORK_REGISTRY_NAME, pex(registry_address)),
             tokenadded,
-            CONTRACT_MANAGER.get_abi(CONTRACT_REGISTRY),
+            CONTRACT_MANAGER.get_abi(CONTRACT_TOKEN_NETWORK_REGISTRY),
             registry_proxy.tokenadded_filter,
         )
 
@@ -313,32 +281,14 @@ class BlockchainEvents:
         manager_address = channel_manager_proxy.address
 
         self.add_event_listener(
-            'ChannelManager {}'.format(pex(manager_address)),
+            '{0} {1}'.format(CONTRACT_TOKEN_NETWORK_NAME, pex(manager_address)),
             channelnew,
-            CONTRACT_MANAGER.get_abi('channel_manager'),
+            CONTRACT_MANAGER.get_abi(CONTRACT_TOKEN_NETWORK),
             channel_manager_proxy.channelnew_filter,
-        )
-
-    def add_netting_channel_listener(self, netting_channel_proxy, from_block=None):
-        netting_channel_events = netting_channel_proxy.all_events_filter(from_block)
-        channel_address = netting_channel_proxy.address
-
-        self.add_event_listener(
-            'NettingChannel Event {}'.format(pex(channel_address)),
-            netting_channel_events,
-            CONTRACT_MANAGER.get_abi('netting_channel'),
-            netting_channel_proxy.all_events_filter,
         )
 
     def add_proxies_listeners(self, proxies, from_block=None):
         self.add_registry_listener(proxies.registry, from_block)
 
-        for manager in proxies.channel_managers:
+        for manager in proxies.token_networks:
             self.add_channel_manager_listener(manager, from_block)
-
-        all_netting_channels = itertools.chain(
-            *proxies.channelmanager_nettingchannels.values()
-        )
-
-        for channel in all_netting_channels:
-            self.add_netting_channel_listener(channel, from_block)

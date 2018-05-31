@@ -5,7 +5,8 @@ import structlog
 
 from raiden.blockchain.abi import (
     CONTRACT_MANAGER,
-    CONTRACT_REGISTRY,
+    CONTRACT_TOKEN_NETWORK_REGISTRY,
+    CONTRACT_TOKEN_NETWORK_REGISTRY_NAME,
 
     EVENT_TOKEN_ADDED,
 )
@@ -23,7 +24,7 @@ from raiden.utils import (
 from raiden.settings import (
     DEFAULT_POLL_TIMEOUT,
 )
-from raiden.network.proxies.channel_manager import ChannelManager
+from raiden.network.proxies.channel_manager import TokenNetwork
 from raiden.network.rpc.client import check_address_has_code
 from raiden.network.rpc.transactions import (
     check_transaction_threw,
@@ -37,7 +38,7 @@ from raiden.network.rpc.filters import (
 log = structlog.get_logger(__name__)  # pylint: disable=invalid-name
 
 
-class Registry:
+class TokenNetworksRegistry:
     def __init__(
             self,
             jsonrpc_client,
@@ -48,15 +49,15 @@ class Registry:
         if not isaddress(registry_address):
             raise ValueError('registry_address must be a valid address')
 
-        check_address_has_code(jsonrpc_client, registry_address, 'Registry')
+        check_address_has_code(jsonrpc_client, registry_address, CONTRACT_TOKEN_NETWORK_REGISTRY_NAME)
 
         proxy = jsonrpc_client.new_contract_proxy(
-            CONTRACT_MANAGER.get_abi(CONTRACT_REGISTRY),
+            CONTRACT_MANAGER.get_abi(CONTRACT_TOKEN_NETWORK_REGISTRY),
             address_encoder(registry_address),
         )
         CONTRACT_MANAGER.check_contract_version(
             proxy.call('contract_version').decode(),
-            CONTRACT_REGISTRY
+            CONTRACT_TOKEN_NETWORK_REGISTRY
         )
 
         self.address = registry_address
@@ -73,7 +74,7 @@ class Registry:
         there is no correspoding address.
         """
         address = self.proxy.call(
-            'channelManagerByToken',
+            'token_to_token_networks',
             token_address,
         )
 
@@ -96,9 +97,8 @@ class Registry:
 
         transaction_hash = estimate_and_transact(
             self.proxy,
-            'addToken',
-            self.address,
-            token_address,
+            'createERC20TokenNetwork',
+            token_address
         )
 
         self.client.poll(unhexlify(transaction_hash), timeout=self.poll_timeout)
@@ -110,7 +110,7 @@ class Registry:
                 token_address=pex(token_address),
                 registry_address=pex(self.address),
             )
-            raise TransactionThrew('AddToken', receipt_or_none)
+            raise TransactionThrew('createERC20TokenNetwork', receipt_or_none)
 
         manager_address = self.manager_address_by_token(token_address)
 
@@ -122,7 +122,7 @@ class Registry:
                 registry_address=pex(self.address),
             )
 
-            raise RuntimeError('channelManagerByToken failed')
+            raise RuntimeError('token_to_token_networks failed')
 
         log.info(
             'add_token sucessful',
@@ -135,16 +135,18 @@ class Registry:
         return manager_address
 
     def token_addresses(self):
-        return [
-            address_decoder(address)
-            for address in self.proxy.call('tokenAddresses')
-        ]
+        #return [
+        #    address_decoder(address)
+        #    for address in self.proxy.call('tokenAddresses')
+        #]
+        return []
 
     def manager_addresses(self):
-        return [
-            address_decoder(address)
-            for address in self.proxy.call('channelManagerAddresses')
-        ]
+        #return [
+        #    address_decoder(address)
+        #    for address in self.proxy.call('channelManagerAddresses')
+        #]
+        return []
 
     def tokenadded_filter(self, from_block=None, to_block=None):
         topics = [CONTRACT_MANAGER.get_event_id(EVENT_TOKEN_ADDED)]
@@ -164,12 +166,12 @@ class Registry:
         )
 
     def manager(self, manager_address):
-        """ Return a proxy to interact with a ChannelManagerContract. """
+        """ Return a proxy to interact with a TokenNetwork. """
         if not isaddress(manager_address):
             raise ValueError('manager_address must be a valid address')
 
         if manager_address not in self.address_to_channelmanager:
-            manager = ChannelManager(
+            manager = TokenNetwork(
                 self.client,
                 manager_address,
                 self.poll_timeout,
@@ -201,7 +203,7 @@ class Registry:
                     'Manager for token 0x{} does not exist'.format(hexlify(token_address))
                 )
 
-            manager = ChannelManager(
+            manager = TokenNetwork(
                 self.client,
                 manager_address,
                 self.poll_timeout,

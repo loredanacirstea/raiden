@@ -16,6 +16,17 @@ from raiden.tests.utils.blockchain import geth_create_blockchain
 from raiden.settings import GAS_PRICE
 from raiden.utils.solc import compile_files_cwd
 
+from raiden.blockchain.abi import (
+    CONTRACT_TOKEN_NETWORK_REGISTRY_FILE,
+    CONTRACT_TOKEN_NETWORK_REGISTRY_NAME,
+    CONTRACT_HUMAN_STANDARD_TOKEN_NAME,
+    CONTRACT_HUMAN_STANDARD_TOKEN_FILE,
+    CONTRACT_ENDPOINT_REGISTRY_FILE,
+    CONTRACT_ENDPOINT_REGISTRY_NAME,
+    CONTRACT_SECRET_REGISTRY_FILE,
+    CONTRACT_SECRET_REGISTRY_NAME,
+)
+
 BlockchainServices = namedtuple(
     'BlockchainServices',
     (
@@ -52,16 +63,16 @@ def _token_addresses(
         if register:
             token_address = deploy_service.deploy_and_register_token(
                 registry,
-                contract_name='HumanStandardToken',
-                contract_path=get_contract_path('HumanStandardToken.sol'),
-                constructor_parameters=(token_amount, 'raiden', 2, 'Rd'),
+                contract_name=CONTRACT_HUMAN_STANDARD_TOKEN_NAME,
+                contract_path=get_contract_path(CONTRACT_HUMAN_STANDARD_TOKEN_FILE),
+                constructor_parameters=(token_amount, 2, 'raiden', 'Rd'),
             )
             result.append(token_address)
         else:
             token_address = deploy_service.deploy_contract(
-                contract_name='HumanStandardToken',
-                contract_path=get_contract_path('HumanStandardToken.sol'),
-                constructor_parameters=(token_amount, 'raiden', 2, 'Rd'),
+                contract_name=CONTRACT_HUMAN_STANDARD_TOKEN_NAME,
+                contract_path=get_contract_path(CONTRACT_HUMAN_STANDARD_TOKEN_FILE),
+                constructor_parameters=(token_amount, 2, 'raiden', 'Rd'),
             )
             result.append(token_address)
 
@@ -148,8 +159,8 @@ def blockchain_services(
 @pytest.fixture
 def endpoint_discovery_services(blockchain_services):
     discovery_address = blockchain_services.deploy_service.deploy_contract(
-        'EndpointRegistry',
-        get_contract_path('EndpointRegistry.sol'),
+        CONTRACT_ENDPOINT_REGISTRY_NAME,
+        get_contract_path(CONTRACT_ENDPOINT_REGISTRY_FILE),
     )
 
     return [
@@ -256,15 +267,30 @@ def _jsonrpc_services(
     # we cannot instantiate BlockChainService without a registry, so first
     # deploy it directly with a JSONRPCClient
     if registry_address is None:
-        registry_path = get_contract_path('Registry.sol')
+        secret_registry_path = get_contract_path(CONTRACT_SECRET_REGISTRY_FILE)
+        secret_registry_contracts = compile_files_cwd([secret_registry_path])
+
+        log.info('Deploying secret registry contract')
+        secret_registry_proxy = deploy_client.deploy_solidity_contract(
+            CONTRACT_SECRET_REGISTRY_NAME,
+            secret_registry_contracts,
+            dict(),
+            tuple(),
+            contract_path=secret_registry_path,
+            timeout=poll_timeout,
+        )
+        secret_registry_address = secret_registry_proxy.contract_address
+
+        registry_path = get_contract_path(CONTRACT_TOKEN_NETWORK_REGISTRY_FILE)
         registry_contracts = compile_files_cwd([registry_path])
+        network_id = int(deploy_client.web3.version.network)
 
         log.info('Deploying registry contract')
         registry_proxy = deploy_client.deploy_solidity_contract(
-            'Registry',
+            CONTRACT_TOKEN_NETWORK_REGISTRY_NAME,
             registry_contracts,
             dict(),
-            tuple(),
+            (secret_registry_address, network_id),
             contract_path=registry_path,
             timeout=poll_timeout,
         )

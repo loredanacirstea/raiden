@@ -21,12 +21,23 @@ from raiden.exceptions import ContractVersionMismatch
 
 __all__ = (
     'CONTRACT_MANAGER',
-
-    'CONTRACT_CHANNEL_MANAGER',
+    'CONTRACT_TOKEN_NETWORK_REGISTRY',
+    'CONTRACT_TOKEN_NETWORK',
+    'CONTRACT_SECRET_REGISTRY',
     'CONTRACT_ENDPOINT_REGISTRY',
     'CONTRACT_HUMAN_STANDARD_TOKEN',
-    'CONTRACT_NETTING_CHANNEL',
-    'CONTRACT_REGISTRY',
+
+    'CONTRACT_TOKEN_NETWORK_REGISTRY_NAME',
+    'CONTRACT_TOKEN_NETWORK_NAME',
+    'CONTRACT_SECRET_REGISTRY_NAME',
+    'CONTRACT_ENDPOINT_REGISTRY_NAME',
+    'CONTRACT_HUMAN_STANDARD_TOKEN_NAME',
+
+    'CONTRACT_TOKEN_NETWORK_REGISTRY_FILE',
+    'CONTRACT_TOKEN_NETWORK_FILE',
+    'CONTRACT_SECRET_REGISTRY_FILE',
+    'CONTRACT_ENDPOINT_REGISTRY_FILE',
+    'CONTRACT_HUMAN_STANDARD_TOKEN_FILE',
 
     'EVENT_CHANNEL_NEW',
     'EVENT_CHANNEL_NEW_BALANCE',
@@ -36,18 +47,36 @@ __all__ = (
     'EVENT_TOKEN_ADDED',
 )
 
-CONTRACT_CHANNEL_MANAGER = 'channel_manager'
-CONTRACT_ENDPOINT_REGISTRY = 'endpoint_registry'
-CONTRACT_HUMAN_STANDARD_TOKEN = 'human_standard_token'
-CONTRACT_NETTING_CHANNEL = 'netting_channel'
-CONTRACT_REGISTRY = 'registry'
+CONTRACT_TOKEN_NETWORK_NAME = 'TokenNetwork'
+CONTRACT_HUMAN_STANDARD_TOKEN_NAME = 'HumanStandardToken'
+CONTRACT_STANDARD_TOKEN_NAME = 'StandardToken'
+CONTRACT_TOKEN_NETWORK_REGISTRY_NAME = 'TokenNetworksRegistry'
+CONTRACT_SECRET_REGISTRY_NAME = 'SecretRegistry'
+CONTRACT_ENDPOINT_REGISTRY_NAME = 'EndpointRegistry'
 
-EVENT_CHANNEL_NEW = 'ChannelNew'
-EVENT_CHANNEL_NEW_BALANCE = 'ChannelNewBalance'
+CONTRACT_TOKEN_NETWORK_FILE = '{}.sol'.format(CONTRACT_TOKEN_NETWORK_NAME)
+CONTRACT_HUMAN_STANDARD_TOKEN_FILE = '{}.sol'.format(CONTRACT_HUMAN_STANDARD_TOKEN_NAME)
+CONTRACT_STANDARD_TOKEN_FILE = '{}.sol'.format(CONTRACT_STANDARD_TOKEN_NAME)
+CONTRACT_TOKEN_NETWORK_REGISTRY_FILE = '{}.sol'.format(CONTRACT_TOKEN_NETWORK_REGISTRY_NAME)
+CONTRACT_SECRET_REGISTRY_FILE = '{}.sol'.format(CONTRACT_SECRET_REGISTRY_NAME)
+CONTRACT_ENDPOINT_REGISTRY_FILE = '{}.sol'.format(CONTRACT_ENDPOINT_REGISTRY_NAME)
+
+CONTRACT_TOKEN_NETWORK = 'token_network'
+CONTRACT_HUMAN_STANDARD_TOKEN = 'human_standard_token'
+CONTRACT_TOKEN_NETWORK_REGISTRY = 'registry'
+CONTRACT_SECRET_REGISTRY = 'secret_registry'
+CONTRACT_ENDPOINT_REGISTRY = 'endpoint_registry'
+
+EVENT_CHANNEL_NEW = 'ChannelOpened'
+EVENT_CHANNEL_NEW_BALANCE = 'ChannelNewDeposit'
+EVENT_CHANNEL_WITHDRAW = 'ChannelWithdraw'
+EVENT_CHANNEL_UNLOCK = 'ChannelUnlocked'
+EVENT_TRANSFER_UPDATED = 'NonClosingBalanceProofUpdated'
 EVENT_CHANNEL_CLOSED = 'ChannelClosed'
-EVENT_CHANNEL_SECRET_REVEALED = 'ChannelSecretRevealed'
 EVENT_CHANNEL_SETTLED = 'ChannelSettled'
-EVENT_TOKEN_ADDED = 'TokenAdded'
+EVENT_CHANNEL_SECRET_REVEALED = 'SecretRevealed'
+EVENT_TOKEN_ADDED = 'TokenNetworkCreated'
+EVENT_ADDRESS_REGISTERED = 'AddressRegistered'
 
 CONTRACT_VERSION_RE = r'^\s*string constant public contract_version = "([0-9]+\.[0-9]+\.[0-9\_])";\s*$' # noqa
 
@@ -131,8 +160,8 @@ def validate_solc():
 
     try:
         compile_files(
-            [get_contract_path('HumanStandardToken.sol')],
-            'HumanStandardToken',
+            [get_contract_path(CONTRACT_HUMAN_STANDARD_TOKEN_FILE)],
+            CONTRACT_HUMAN_STANDARD_TOKEN_NAME,
             optimize=False,
         )
     except subprocess.CalledProcessError as e:
@@ -171,19 +200,18 @@ class ContractManager:
         self.is_instantiated = False
         self.lock = Lock()
         self.event_to_contract = {
-            'ChannelNew': CONTRACT_CHANNEL_MANAGER,
-            'ChannelNewBalance': CONTRACT_NETTING_CHANNEL,
-            'ChannelClosed': CONTRACT_NETTING_CHANNEL,
-            'ChannelSecretRevealed': CONTRACT_NETTING_CHANNEL,
-            'ChannelSettled': CONTRACT_NETTING_CHANNEL,
-            'TokenAdded': CONTRACT_REGISTRY,
+            EVENT_CHANNEL_NEW: CONTRACT_TOKEN_NETWORK,
+            EVENT_CHANNEL_NEW_BALANCE: CONTRACT_TOKEN_NETWORK,
+            EVENT_CHANNEL_CLOSED: CONTRACT_TOKEN_NETWORK,
+            EVENT_CHANNEL_SECRET_REVEALED: CONTRACT_SECRET_REGISTRY_NAME,
+            EVENT_CHANNEL_SETTLED: CONTRACT_TOKEN_NETWORK,
+            EVENT_TOKEN_ADDED: CONTRACT_TOKEN_NETWORK_REGISTRY,
         }
         self.contract_to_version = dict()
 
         self.human_standard_token_compiled = None
         self.channel_manager_compiled = None
         self.endpoint_registry_compiled = None
-        self.netting_channel_compiled = None
         self.registry_compiled = None
 
     def instantiate(self):
@@ -192,32 +220,26 @@ class ContractManager:
                 return
 
             self.human_standard_token_compiled = get_static_or_compile(
-                get_contract_path('HumanStandardToken.sol'),
-                'HumanStandardToken',
+                get_contract_path(CONTRACT_HUMAN_STANDARD_TOKEN_FILE),
+                CONTRACT_HUMAN_STANDARD_TOKEN_NAME,
                 optimize=False,
             )
 
-            self.channel_manager_compiled = get_static_or_compile(
-                get_contract_path('ChannelManagerContract.sol'),
-                'ChannelManagerContract',
+            self.token_network_compiled = get_static_or_compile(
+                get_contract_path(CONTRACT_TOKEN_NETWORK_FILE),
+                CONTRACT_TOKEN_NETWORK_NAME,
                 optimize=False,
             )
 
             self.endpoint_registry_compiled = get_static_or_compile(
-                get_contract_path('EndpointRegistry.sol'),
-                'EndpointRegistry',
-                optimize=False,
-            )
-
-            self.netting_channel_compiled = get_static_or_compile(
-                get_contract_path('NettingChannelContract.sol'),
-                'NettingChannelContract',
+                get_contract_path(CONTRACT_ENDPOINT_REGISTRY_FILE),
+                CONTRACT_ENDPOINT_REGISTRY_NAME,
                 optimize=False,
             )
 
             self.registry_compiled = get_static_or_compile(
-                get_contract_path('Registry.sol'),
-                'Registry',
+                get_contract_path(CONTRACT_TOKEN_NETWORK_REGISTRY_FILE),
+                CONTRACT_TOKEN_NETWORK_REGISTRY_NAME,
                 optimize=False,
             )
 
@@ -226,11 +248,11 @@ class ContractManager:
 
     def init_contract_versions(self):
         contracts = [
-            ('HumanStandardToken.sol', CONTRACT_HUMAN_STANDARD_TOKEN),
-            ('ChannelManagerContract.sol', CONTRACT_CHANNEL_MANAGER),
-            ('EndpointRegistry.sol', CONTRACT_ENDPOINT_REGISTRY),
-            ('NettingChannelContract.sol', CONTRACT_NETTING_CHANNEL),
-            ('Registry.sol', CONTRACT_REGISTRY)
+            (CONTRACT_HUMAN_STANDARD_TOKEN_FILE, CONTRACT_HUMAN_STANDARD_TOKEN),
+            (CONTRACT_TOKEN_NETWORK_FILE, CONTRACT_TOKEN_NETWORK),
+            (CONTRACT_TOKEN_NETWORK_REGISTRY_FILE, CONTRACT_TOKEN_NETWORK_REGISTRY),
+            (CONTRACT_ENDPOINT_REGISTRY_FILE, CONTRACT_ENDPOINT_REGISTRY),
+            (CONTRACT_SECRET_REGISTRY_FILE, CONTRACT_SECRET_REGISTRY),
         ]
         version_re = re.compile(CONTRACT_VERSION_RE)
         for contract_file, contract_name in contracts:

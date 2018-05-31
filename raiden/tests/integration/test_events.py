@@ -11,9 +11,9 @@ from raiden.blockchain.abi import (
 )
 from raiden.blockchain.events import (
     ALL_EVENTS,
-    get_all_channel_manager_events,
-    get_all_netting_channel_events,
-    get_all_registry_events,
+    get_all_token_network_events,
+    get_all_channel_events,
+    get_all_token_network_registry_events,
 )
 from raiden.tests.utils.transfer import (
     assert_synched_channel_state,
@@ -143,7 +143,7 @@ def test_query_events(raiden_chain, token_addresses, deposit, settle_timeout, ev
         token_address,
     )
 
-    events = get_all_registry_events(
+    events = get_all_token_network_registry_events(
         app0.raiden.chain,
         registry_address,
         events=ALL_EVENTS,
@@ -160,7 +160,7 @@ def test_query_events(raiden_chain, token_addresses, deposit, settle_timeout, ev
         'block_number': 'ignore',
     })
 
-    events = get_all_registry_events(
+    events = get_all_token_network_registry_events(
         app0.raiden.chain,
         app0.raiden.default_registry.address,
         events=ALL_EVENTS,
@@ -177,7 +177,7 @@ def test_query_events(raiden_chain, token_addresses, deposit, settle_timeout, ev
 
     gevent.sleep(events_poll_timeout * 2)
 
-    events = get_all_channel_manager_events(
+    events = get_all_token_network_events(
         app0.raiden.chain,
         manager0.address,
         events=ALL_EVENTS,
@@ -196,7 +196,7 @@ def test_query_events(raiden_chain, token_addresses, deposit, settle_timeout, ev
         'block_number': 'ignore',
     })
 
-    events = get_all_channel_manager_events(
+    events = get_all_token_network_events(
         app0.raiden.chain,
         manager0.address,
         events=ALL_EVENTS,
@@ -228,14 +228,14 @@ def test_query_events(raiden_chain, token_addresses, deposit, settle_timeout, ev
 
     gevent.sleep(events_poll_timeout * 2)
 
-    all_netting_channel_events = get_all_netting_channel_events(
+    all_netting_channel_events = get_all_channel_events(
         app0.raiden.chain,
         channel_address,
         from_block=0,
         to_block='latest',
     )
 
-    events = get_all_netting_channel_events(
+    events = get_all_channel_events(
         app0.raiden.chain,
         channel_address,
         events=[CONTRACT_MANAGER.get_event_id(EVENT_CHANNEL_NEW_BALANCE)],
@@ -264,14 +264,14 @@ def test_query_events(raiden_chain, token_addresses, deposit, settle_timeout, ev
 
     gevent.sleep(events_poll_timeout * 2)
 
-    all_netting_channel_events = get_all_netting_channel_events(
+    all_netting_channel_events = get_all_channel_events(
         app0.raiden.chain,
         netting_channel_address=channel_address,
         from_block=0,
         to_block='latest',
     )
 
-    events = get_all_netting_channel_events(
+    events = get_all_channel_events(
         app0.raiden.chain,
         channel_address,
         events=[CONTRACT_MANAGER.get_event_id(EVENT_CHANNEL_CLOSED)],
@@ -293,14 +293,14 @@ def test_query_events(raiden_chain, token_addresses, deposit, settle_timeout, ev
     settle_expiration = app0.raiden.chain.block_number() + settle_timeout + 5
     wait_until_block(app0.raiden.chain, settle_expiration)
 
-    all_netting_channel_events = get_all_netting_channel_events(
+    all_netting_channel_events = get_all_channel_events(
         app0.raiden.chain,
         netting_channel_address=channel_address,
         from_block=0,
         to_block='latest',
     )
 
-    events = get_all_netting_channel_events(
+    events = get_all_channel_events(
         app0.raiden.chain,
         channel_address,
         events=[CONTRACT_MANAGER.get_event_id(EVENT_CHANNEL_SETTLED)],

@@ -8,7 +8,16 @@ from eth_utils import to_canonical_address
 
 from raiden import waiting
 from raiden.api.python import RaidenAPI
-from raiden.blockchain.abi import CONTRACT_MANAGER, CONTRACT_CHANNEL_MANAGER
+from raiden.blockchain.abi import (
+    CONTRACT_MANAGER,
+    CONTRACT_TOKEN_NETWORK,
+    CONTRACT_HUMAN_STANDARD_TOKEN_FILE,
+    CONTRACT_HUMAN_STANDARD_TOKEN_NAME,
+    CONTRACT_SECRET_REGISTRY_FILE,
+    CONTRACT_SECRET_REGISTRY_NAME,
+    CONTRACT_TOKEN_NETWORK_REGISTRY_FILE,
+    CONTRACT_TOKEN_NETWORK_REGISTRY_NAME,
+)
 from raiden.exceptions import AddressWithoutCode, SamePeerAddress
 from raiden.network.rpc.client import JSONRPCClient
 from raiden.network.rpc.transactions import check_transaction_threw
@@ -33,12 +42,12 @@ def test_new_netting_contract(raiden_network, token_amount, settle_timeout):
     registry = app0.raiden.default_registry
     registry_address = app0.raiden.default_registry.address
 
-    humantoken_path = get_contract_path('HumanStandardToken.sol')
+    humantoken_path = get_contract_path(CONTRACT_HUMAN_STANDARD_TOKEN_FILE)
     token_address = blockchain_service0.deploy_and_register_token(
         registry,
-        contract_name='HumanStandardToken',
+        contract_name=CONTRACT_HUMAN_STANDARD_TOKEN_NAME,
         contract_path=humantoken_path,
-        constructor_parameters=(token_amount, 'raiden', 2, 'Rd'),
+        constructor_parameters=(token_amount, 2, 'raiden', 'Rd'),
     )
 
     token0 = blockchain_service0.token(token_address)
@@ -219,24 +228,37 @@ def test_blockchain(
         privatekey,
     )
 
-    humantoken_path = get_contract_path('HumanStandardToken.sol')
+    humantoken_path = get_contract_path(CONTRACT_HUMAN_STANDARD_TOKEN_FILE)
     humantoken_contracts = compile_files_cwd([humantoken_path])
     token_proxy = jsonrpc_client.deploy_solidity_contract(
-        'HumanStandardToken',
+        CONTRACT_HUMAN_STANDARD_TOKEN_NAME,
         humantoken_contracts,
         list(),
-        (total_token, 'raiden', 2, 'Rd'),
+        (total_token, 2, 'raiden', 'Rd'),
         contract_path=humantoken_path,
         timeout=poll_timeout,
     )
 
-    registry_path = get_contract_path('Registry.sol')
-    registry_contracts = compile_files_cwd([registry_path])
-    registry_proxy = jsonrpc_client.deploy_solidity_contract(
-        'Registry',
-        registry_contracts,
+    secret_registry_path = get_contract_path(CONTRACT_SECRET_REGISTRY_FILE)
+    secret_registry_contracts = compile_files_cwd([secret_registry_path])
+    secret_registry_proxy = jsonrpc_client.deploy_solidity_contract(
+        CONTRACT_SECRET_REGISTRY_NAME,
+        secret_registry_contracts,
         list(),
         tuple(),
+        contract_path=secret_registry_path,
+        timeout=poll_timeout,
+    )
+    secret_registry_address = secret_registry_proxy.contract_address
+
+    registry_path = get_contract_path(CONTRACT_TOKEN_NETWORK_REGISTRY_FILE)
+    registry_contracts = compile_files_cwd([registry_path])
+    network_id = int(jsonrpc_client.web3.version.network)
+    registry_proxy = jsonrpc_client.deploy_solidity_contract(
+        CONTRACT_TOKEN_NETWORK_REGISTRY_NAME,
+        registry_contracts,
+        list(),
+        (secret_registry_address, network_id),
         contract_path=registry_path,
         timeout=poll_timeout,
     )
@@ -252,13 +274,10 @@ def test_blockchain(
 
     assert token_proxy.call('balanceOf', address) == total_token
     transaction_hash = registry_proxy.transact(
-        'addToken',
-        address,
+        'createERC20TokenNetwork',
         token_proxy.contract_address,
     )
     jsonrpc_client.poll(unhexlify(transaction_hash), timeout=poll_timeout)
-
-    assert len(registry_proxy.call('tokenAddresses')) == 1
 
     log_list = jsonrpc_client.web3.eth.getLogs(
         {
@@ -270,7 +289,7 @@ def test_blockchain(
     assert len(log_list) == 1
 
     channel_manager_address_encoded = registry_proxy.call(
-        'channelManagerByToken',
+        'token_to_token_networks',
         token_proxy.contract_address,
     )
     channel_manager_address = to_canonical_address(channel_manager_address_encoded)
@@ -279,16 +298,17 @@ def test_blockchain(
     event = registry_proxy.decode_event(log)
     event_args = event['args']
 
-    assert channel_manager_address == to_canonical_address(event_args['channel_manager_address'])
+    assert channel_manager_address == to_canonical_address(event_args['token_network_address'])
     assert token_proxy.contract_address == to_canonical_address(event_args['token_address'])
 
     channel_manager_proxy = jsonrpc_client.new_contract_proxy(
-        CONTRACT_MANAGER.get_abi(CONTRACT_CHANNEL_MANAGER),
+        CONTRACT_MANAGER.get_abi(CONTRACT_TOKEN_NETWORK),
         channel_manager_address,
     )
 
     transaction_hash = channel_manager_proxy.transact(
-        'newChannel',
+        'openChannel',
+        address,
         addresses[1],
         10,
     )
@@ -330,7 +350,8 @@ def test_channel_with_self(raiden_network, settle_timeout, token_addresses):
     assert 'The other peer must not have the same address as the client.' in str(excinfo.value)
 
     transaction_hash = graph0.proxy.transact(
-        'newChannel',
+        'openChannel',
+        app0.raiden.address,
         app0.raiden.address,
         settle_timeout,
     )

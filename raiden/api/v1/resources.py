@@ -103,7 +103,7 @@ class NetworkEventsResource(BaseResource):
 
     @use_kwargs(get_schema, locations=('query',))
     def get(self, from_block, to_block):
-        return self.rest_api.get_network_events(
+        return self.rest_api.get_token_network_registry_events(
             registry_address=self.rest_api.raiden_api.raiden.default_registry.address,
             from_block=from_block,
             to_block=to_block,

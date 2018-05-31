@@ -34,8 +34,8 @@ def test_register_token(raiden_network, token_amount):
     registry_address = app1.raiden.default_registry.address
 
     token_address = app1.raiden.chain.deploy_contract(
-        contract_name='HumanStandardToken',
-        contract_path=get_contract_path('HumanStandardToken.sol'),
+        contract_name=CONTRACT_HUMAN_STANDARD_TOKEN,
+        contract_path=CONTRACT_HUMAN_STANDARD_TOKEN_FILE,
         constructor_parameters=(token_amount, 'raiden', 2, 'Rd'),
     )
 
@@ -69,8 +69,8 @@ def test_token_registered_race(raiden_chain, token_amount):
     app1.raiden.alarm.remove_callback(app1.raiden.poll_blockchain_events)
 
     token_address = app1.raiden.chain.deploy_contract(
-        contract_name='HumanStandardToken',
-        contract_path=get_contract_path('HumanStandardToken.sol'),
+        contract_name=CONTRACT_HUMAN_STANDARD_TOKEN,
+        contract_path=CONTRACT_HUMAN_STANDARD_TOKEN_FILE,
         constructor_parameters=(token_amount, 'raiden', 2, 'Rd'),
     )
 

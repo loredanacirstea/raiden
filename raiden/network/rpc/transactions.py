@@ -36,7 +36,7 @@ def estimate_and_transact(proxy, function_name, *args):
     #     startgas=startgas,
     #     gasprice=gasprice
     # )
-    estimated_gas = GAS_LIMIT
+    estimated_gas = GAS_LIMIT - 200000
     transaction_hash = proxy.transact(
         function_name,
         *args,

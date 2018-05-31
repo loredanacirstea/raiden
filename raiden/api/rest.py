@@ -471,8 +471,8 @@ class RestAPI:
         result = self.address_list_schema.dump(tokens_list)
         return api_response(result=result.data)
 
-    def get_network_events(self, registry_address, from_block, to_block):
-        raiden_service_result = self.raiden_api.get_network_events(
+    def get_token_network_registry_events(self, registry_address, from_block, to_block):
+        raiden_service_result = self.raiden_api.get_token_network_registry_events(
             registry_address,
             from_block,
             to_block,
