@@ -6,12 +6,12 @@ If you deploy this, you won't have anything useful.
 
 Implements ERC 20 Token standard: https://github.com/ethereum/EIPs/issues/20
 .*/
-pragma solidity ^0.4.21;
+pragma solidity ^0.4.23;
 import "./Token.sol";
 
 contract StandardToken is Token {
     uint256 internal _total_supply;
-    mapping (address => uint256) balances;
+    mapping (address => uint256) public balances;
     mapping (address => mapping (address => uint256)) allowed;
 
     function transfer(address _to, uint256 _value) public returns (bool success) {
@@ -27,10 +27,16 @@ contract StandardToken is Token {
         } else { return false; }
     }
 
-    function transferFrom(address _from, address _to, uint256 _value) public returns (bool success) {
+    function transferFrom(address _from, address _to, uint256 _value)
+        public
+        returns (bool success)
+    {
         //same as above. Replace this line with the following if you want to protect against wrapping uints.
         //if (balances[_from] >= _value && allowed[_from][msg.sender] >= _value && balances[_to] + _value > balances[_to]) {
-        if (balances[_from] >= _value && allowed[_from][msg.sender] >= _value && _value > 0) {
+        require(balances[_from] >= _value);
+        require(allowed[_from][msg.sender] >= _value);
+        require(_value > 0);
+        if ((balances[_from] >= _value) && (allowed[_from][msg.sender] >= _value) && (_value > 0)) {
             balances[_to] += _value;
             balances[_from] -= _value;
             allowed[_from][msg.sender] -= _value;

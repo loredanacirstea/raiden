@@ -4,10 +4,10 @@
  * The Ethereum address registers his address in this registry.
 */
 
-pragma solidity ^0.4.21;
+pragma solidity ^0.4.23;
 
 contract EndpointRegistry{
-    string constant public contract_version = "0.2._";
+    string constant public contract_version = "0.3._";
 
     event AddressRegistered(address indexed eth_address, string socket);
 
@@ -71,7 +71,7 @@ contract EndpointRegistry{
 
     function equals(string a, string b) internal pure returns (bool result)
     {
-        if (keccak256(a) == keccak256(b)) {
+        if (keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b))) {
             return true;
         }
 
