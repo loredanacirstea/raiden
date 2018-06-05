@@ -162,7 +162,8 @@ def raiden_chain(
         use_matrix,
         local_matrix_server,
     )
-
+    print('------- raiden_chain')
+    log.debug('---- raiden_chain')
     for app in raiden_apps:
         app.raiden.register_payment_network(app.raiden.default_registry.address)
 

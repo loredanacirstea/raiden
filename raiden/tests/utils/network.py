@@ -51,6 +51,7 @@ def netting_channel_open_and_deposit(app0, app1, token_address, deposit, settle_
     assert token_address
 
     manager = app0.raiden.default_registry.manager_by_token(token_address)
+    print('--- netting_channel_open_and_deposit', netting_channel_open_and_deposit)
     netcontract_address = manager.new_netting_channel(
         app1.raiden.address,
         settle_timeout,

@@ -264,6 +264,8 @@ class RaidenService:
             storage,
         )
 
+        print('---- unapplied_events', unapplied_events)
+
         last_log_block_number = None
         # First run, initialize the basic state
         if self.wal.state_manager.current_state is None:
@@ -392,21 +394,23 @@ class RaidenService:
         message.sign(self.private_key, self.address)
 
     def register_payment_network(self, registry_address, from_block=None):
+        print('------- register_payment_network0')
         proxies = get_relevant_proxies(
             self.chain,
             self.address,
             registry_address,
         )
-
+        print('------- register_payment_network1')
+        print('-- proxies', proxies)
         # Install the filters first to avoid missing changes, as a consequence
         # some events might be applied twice.
         self.blockchain_events.add_proxies_listeners(proxies, from_block)
-
+        print('------- register_payment_network2', proxies)
         token_network_list = list()
         for token_network in proxies.token_networks:
             token_network_address = token_network.address
-
-            network = get_token_network_state_from_proxies(self, manager, netting_channel_proxies)
+            print('------- register_payment_network3')
+            network = get_token_network_state_from_proxies(self, manager)
             token_network_list.append(network)
 
         payment_network = PaymentNetworkState(

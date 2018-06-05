@@ -9,7 +9,11 @@ from raiden.utils import get_contract_path
 from raiden.utils.solc import compile_files_cwd
 from raiden.exceptions import ContractVersionMismatch
 
-from raiden.blockchain.abi import CONTRACT_VERSION_RE, CONTRACT_MANAGER
+from raiden.blockchain.abi import (
+    CONTRACT_VERSION_RE,
+    CONTRACT_MANAGER,
+    CONTRACT_TOKEN_NETWORK_REGISTRY_FILE,
+)
 
 
 def replace_contract_version(file_path, new_version):
@@ -39,7 +43,7 @@ def test_deploy_contract(raiden_network, deploy_client, tmpdir):
     """Test deploying contract with different version than the one we have set in Registry.sol.
     This test makes sense only for geth backend, tester uses mocked Registry class.
     """
-    contract_path = get_contract_path('Registry.sol')
+    contract_path = get_contract_path(CONTRACT_TOKEN_NETWORK_REGISTRY_FILE)
     #  Create temporary directory to put all files required to compile the changed contract to.
     #  Why? Solidity uses first 40 characters of the file path as a library symbol.
     #  It would be nice to just do a copy of 'Registry.sol', replace version and include statements
@@ -47,7 +51,7 @@ def test_deploy_contract(raiden_network, deploy_client, tmpdir):
     #  raiden-contracts=/path/to/your/raiden/source/contracts. But then if the path is too long,
     #  Python solidity compiler will fail because of duplicate library symbol.
     temp_dir = TempSolidityDir(os.path.dirname(contract_path), tmpdir)
-    replaced_registry_path = os.path.join(temp_dir.name, 'Registry.sol')
+    replaced_registry_path = os.path.join(temp_dir.name, CONTRACT_TOKEN_NETWORK_REGISTRY_FILE)
 
     CONTRACT_MANAGER.get_abi('channel_manager')
 

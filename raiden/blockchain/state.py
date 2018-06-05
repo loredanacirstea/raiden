@@ -70,16 +70,19 @@ def get_channel_state(token_address, reveal_timeout, netting_channel_proxy):
     return channel
 
 
-def get_token_network_state_from_proxies(raiden, manager_proxy, netting_channel_proxies):
+def get_token_network_state_from_proxies(raiden, manager_proxy):
+    print('-------', raiden)
+    log.debug('----- get_token_network_state_from_proxies raiden {}'.format(raiden))
     manager_address = manager_proxy.address
     token_address = manager_proxy.token_address()
 
-    edge_list = manager_proxy.channels_addresses()
+    #edge_list = manager_proxy.channels_addresses()
+    edge_list = list()
     graph = make_graph(edge_list)
     network_graph = TokenNetworkGraphState(graph)
 
     partner_channels = list()
-    for channel_proxy in netting_channel_proxies:
+    '''for channel_proxy in netting_channel_proxies:
         channel_state = get_channel_state(
             token_address,
             raiden.config['reveal_timeout'],
@@ -87,6 +90,12 @@ def get_token_network_state_from_proxies(raiden, manager_proxy, netting_channel_
         )
         partner_channels.append(channel_state)
 
+    network = TokenNetworkState(
+        manager_address,
+        token_address,
+        network_graph,
+        partner_channels,
+    )'''
     network = TokenNetworkState(
         manager_address,
         token_address,

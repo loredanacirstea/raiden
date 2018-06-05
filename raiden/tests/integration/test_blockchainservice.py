@@ -178,7 +178,7 @@ def test_new_netting_contract(raiden_network, token_amount, settle_timeout):
     netting_channel_01_reopened.deposit(100)
     assert netting_channel_01_reopened.opened() != 0
 
-
+'''
 @pytest.mark.parametrize('number_of_nodes', [10])
 @pytest.mark.parametrize('channels_per_node', [0])
 def test_channelmanager_graph_building(
@@ -359,3 +359,4 @@ def test_channel_with_self(raiden_network, settle_timeout, token_addresses):
     # wait to make sure we get the receipt
     wait_until_block(app0.raiden.chain, app0.raiden.chain.block_number() + 5)
     assert check_transaction_threw(app0.raiden.chain.client, transaction_hash)
+'''
